@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 
 
 import type { Cuotas, Persona } from '@/types';
@@ -18,8 +19,6 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
-import { title } from 'process';
-import { color } from 'chart.js/helpers';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -71,27 +70,47 @@ export default function ApartmentChart({ apartamento, cuotas, personas }: Apartm
 
   const barOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
       title: { display: true, text: 'Total Pagado por Persona' },
     },
-     scales: {
-    y: {
-      beginAtZero: true,
-      max: cuotaInicialPorPersona, // <-- Aquí fijas el máximo del eje Y
-      title: {
-        display: true,
-        text: 'Cuota Inicial por Persona',
-        font: {
-          size: 16,
-          family: 'Arial',
-          weight: 'bold',
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: cuotaInicialPorPersona, // <-- Aquí fijas el máximo del eje Y
+        title: {
+          display: true,
+          text: 'Cuota Inicial por Persona',
+          font: {
+            size: 16,
+            family: 'Arial',
+            weight: 'bold' as const,
+          },
+          color: '#4B5563', // Color gris oscuro
         },
-        color: '#4B5563', // Color gris oscuro
       },
     },
-  },
   };
+
+  // funcion para calcular la fecha del proximo pago y quien tiene que pagar 
+
+  // 1. Obtén la fecha actual
+const ahora = new Date();
+
+// 2. Filtra las cuotas con fecha de pago en el futuro
+const cuotasFuturas = cuotas
+  .filter(cuota => cuota.fechaPago && new Date(cuota.fechaPago) > ahora);
+
+// 3. Busca la cuota con la fecha más próxima
+const proximaCuota = cuotasFuturas.reduce((min, cuota) =>
+  !min || new Date(cuota.fechaPago) < new Date(min.fechaPago) ? cuota : min,
+  null as Cuotas | null
+);
+
+// 4. Busca la persona correspondiente
+const personaProxima = personas.find(p => String(p.idPersona) === proximaCuota?.persona);
+
 
 
   return (
@@ -102,14 +121,26 @@ export default function ApartmentChart({ apartamento, cuotas, personas }: Apartm
 
       {/* Información resumen */}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card title="Valor Total" value={formatCurrency(apartamento.valor)} color='text-red-600' />
         <Card title="Cuota Inicial" value={formatCurrency(apartamento.cuota_inicial)} color='text-yellow-600' />
         <Card
-          title="Total Pagado"
+          title="Total Pag"
           value={formatCurrency(totalPagado)}
           adicional={`Falta: ${formatCurrency(apartamento.cuota_inicial - totalPagado)}`}
         />
+        <div>
+          <Card title="Proxima cuota" value={
+              proximaCuota
+                ? `${personaProxima?.nombre} - ${new Date(proximaCuota.fechaPago).toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })}`
+                : 'Sin próximas cuotas'
+            } />
+            <Link href={apartamento.linkConsignacion} className="inline-block mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition">
+              Hacer la consignación
+            </Link>
+        </div>
+
+
       </div>
 
       {/* Botones para ver pagos individuales */}
@@ -124,7 +155,7 @@ export default function ApartmentChart({ apartamento, cuotas, personas }: Apartm
 
             return (
               <div key={persona.idPersona} className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
-                <div className={`w-4 h-4 rounded ${persona.color}`}></div>
+                <div className={`w-4 h-4 rounded `}></div>
                 <div>
                   <p className="font-medium text-gray-800 dark:text-gray-200">{persona.nombre}</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -136,7 +167,7 @@ export default function ApartmentChart({ apartamento, cuotas, personas }: Apartm
           })}
         </div>
       </div>
-      <div className="mb-8">
+      <div className='w-full h-120 mb-8'>
         <Bar data={barData} options={barOptions} />
       </div>
 
